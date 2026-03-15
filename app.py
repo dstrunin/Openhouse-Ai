@@ -98,24 +98,20 @@ def main():
     st.title("Openhouse-Ai")
     st.subheader("If an iBuyer bought this house today, would they make money?")
 
-    # Check if models exist
-    if not (MODELS_DIR / "valuation.json").exists():
-        st.error(
-            "Models not trained yet. Run: `python train.py` first.\n\n"
-            "You'll need a free FRED API key: https://fred.stlouisfed.org/docs/api/api_key.html\n"
-            "Set it: `export FRED_API_KEY=your_key`"
-        )
-        return
-
-    valuation, liquidity, engine = load_models()
-    config = load_config()
-
-    # Load latest metro data
+    # Check if data exists (we use latest data directly; models reserved for future forecasting)
     latest_path = PROCESSED_DIR / "latest_by_metro.parquet"
     if not latest_path.exists():
-        st.error("Run `python train.py` first to generate latest_by_metro.parquet")
+        st.error("Run `python train.py` first to generate data.")
         return
+
+    _, _, engine = load_models()
+    config = load_config()
+
+    # Load latest metro data (must have days_on_market — re-run train.py if missing)
     latest = pd.read_parquet(latest_path)
+    if "days_on_market" not in latest.columns:
+        st.error("Re-run `python train.py` to regenerate data with days_on_market.")
+        return
     available_metros = latest["metro"].tolist()
 
     # Inputs
@@ -160,18 +156,11 @@ def main():
                         use_national_fallback = False
                 if metro:
                     row = latest[latest["metro"] == metro].iloc[0]
-                    date = pd.to_datetime(row["date"])
-                    mortgage_rate = float(row["mortgage_rate"])
-                    inventory = float(row["inventory"])
-
-                    # Valuation: metro median scaled by property size (baseline 2000 sqft = typical US home)
-                    metro_median = valuation.predict_for_metro(metro, date, mortgage_rate, inventory)
+                    # Use latest data directly (Zillow ZHVI + days on market) — models were under-predicting
+                    metro_median = float(row["median_sale_price"])
+                    base_hold_days = float(row["days_on_market"])
                     sqft_factor = sqft / 2000  # 2000 sqft = 1.0x (US median home size)
                     predicted_resale = metro_median * sqft_factor
-                    # Liquidity: larger homes may sit longer; slight adjustment by size
-                    base_hold_days = liquidity.predict_for_metro(
-                        metro, date, mortgage_rate, inventory, price_relative_to_median=1.0
-                    )
                     # Larger homes typically take longer to sell (~5% per 1000 sqft above 2000)
                     size_hold_factor = 1 + 0.05 * ((sqft - 2000) / 1000)
                     expected_hold_days = max(1, base_hold_days * size_hold_factor)
@@ -211,8 +200,8 @@ def main():
                         st.warning("No — offer would be negative or unprofitable.")
 
     st.sidebar.caption(
-        "ZIP → metro via pgeocode. No metro match? Uses national average. "
-        "Or select metro directly for 660+ areas."
+        "Data: Zillow ZHVI (typical home value) + days on market. "
+        "ZIP → metro via pgeocode; or select metro for 660+ areas."
     )
 
 

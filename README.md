@@ -63,10 +63,11 @@ No secrets needed — the app uses pre-trained models in the repo.
 
 ## Data Coverage
 
-- **660+ metros** from Zillow Research (ZHVI, days on market, inventory)
+- **660+ metros** from Zillow Research: ZHVI (typical home value), days on market, inventory
+- **Direct data** — uses latest Zillow values (no model prediction for current valuation)
 - **ZIP lookup** via pgeocode → city/state → metro match
-- **National fallback** when ZIP has no metro data (uses US average)
-- **Metro selector** — pick from 660+ metros directly for guaranteed coverage
+- **National fallback** when ZIP has no metro data
+- **Metro selector** — pick from 660+ metros directly
 
 ## MVP Success Criteria
 

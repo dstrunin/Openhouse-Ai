@@ -30,7 +30,7 @@ def main():
     liquidity.save(models_dir / "liquidity")
     print("  Saved.")
 
-    # Save latest metro data for inference (mortgage_rate, inventory per metro)
+    # Save latest metro data for inference (use data directly, not model predictions)
     latest = df.sort_values("date", ascending=False).groupby("metro").first().reset_index()
     # Add National fallback (average across metros) for ZIPs without metro data
     national_row = pd.DataFrame([{
@@ -39,9 +39,10 @@ def main():
         "mortgage_rate": latest["mortgage_rate"].mean(),
         "inventory": latest["inventory"].mean(),
         "median_sale_price": latest["median_sale_price"].mean(),
+        "days_on_market": latest["days_on_market"].mean(),
     }])
     latest = pd.concat([latest, national_row], ignore_index=True)
-    latest[["metro", "date", "mortgage_rate", "inventory", "median_sale_price"]].to_parquet(
+    latest[["metro", "date", "mortgage_rate", "inventory", "median_sale_price", "days_on_market"]].to_parquet(
         processed_dir / "latest_by_metro.parquet", index=False
     )
     print("Saved latest_by_metro.parquet (with National fallback).")
