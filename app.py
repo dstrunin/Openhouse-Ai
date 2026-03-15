@@ -120,13 +120,23 @@ def main():
 
     # Inputs
     st.sidebar.header("Property Inputs")
-    zip_code = st.sidebar.text_input("ZIP Code", placeholder="e.g. 78701, 10001", max_chars=10)
+    input_mode = st.sidebar.radio("Location", ["ZIP Code", "Select Metro"], horizontal=True)
+    if input_mode == "ZIP Code":
+        zip_code = st.sidebar.text_input("ZIP Code", placeholder="e.g. 78701, 10001", max_chars=10)
+        metro_override = None
+    else:
+        metro_options = ["— Select metro —"] + sorted([m for m in available_metros if m != "National"])
+        metro_override = st.sidebar.selectbox("Metro Area", metro_options)
+        metro_override = None if metro_override == "— Select metro —" else metro_override
+        zip_code = ""
     beds = st.sidebar.number_input("Beds", min_value=1, max_value=8, value=3, help="1–8 bedrooms")
     baths = st.sidebar.number_input("Baths", min_value=0.5, max_value=8.0, value=2.0, step=0.5, help="0.5–8 bathrooms")
     sqft = st.sidebar.number_input("Sqft", min_value=400, max_value=15000, value=1800, step=100, help="400–15,000 sqft")
 
     if st.sidebar.button("Get iBuyer Decision"):
-        if not zip_code or not zip_code.strip():
+        if input_mode == "Select Metro" and not metro_override:
+            st.warning("Select a metro area.")
+        elif input_mode == "ZIP Code" and (not zip_code or not zip_code.strip()):
             st.warning("Enter a ZIP code.")
         else:
             validation_errors = validate_property(int(beds), baths, sqft)
@@ -134,13 +144,21 @@ def main():
                 for err in validation_errors:
                     st.error(err)
             else:
-                metro, location_display = resolve_metro_from_zip(zip_code, available_metros)
-                if not metro:
-                    if location_display:
-                        st.error(f"{location_display} — no metro data for this area. Try a major metro ZIP.")
-                    else:
-                        st.error("Invalid or unknown ZIP code. Enter a valid 5-digit US ZIP.")
+                if metro_override:
+                    metro, location_display = metro_override, metro_override
+                    use_national_fallback = False
                 else:
+                    metro, location_display = resolve_metro_from_zip(zip_code, available_metros)
+                    if not metro:
+                        if location_display:
+                            metro, location_display = "National", f"{location_display} (national average)"
+                            use_national_fallback = True
+                        else:
+                            st.error("Invalid or unknown ZIP code. Enter a valid 5-digit US ZIP.")
+                            metro = None
+                    else:
+                        use_national_fallback = False
+                if metro:
                     row = latest[latest["metro"] == metro].iloc[0]
                     date = pd.to_datetime(row["date"])
                     mortgage_rate = float(row["mortgage_rate"])
@@ -163,6 +181,8 @@ def main():
                     # Display property inputs
                     st.write("**Property**")
                     st.write(f"{location_display or metro} · {int(beds)} beds · {baths} baths · {sqft:,} sqft")
+                    if use_national_fallback:
+                        st.info("Metro-level data not available for this ZIP. Using national average — results are approximate.")
                     st.divider()
 
                     # Display
@@ -190,7 +210,10 @@ def main():
                     else:
                         st.warning("No — offer would be negative or unprofitable.")
 
-    st.sidebar.caption("Valuation scales by sqft (2000 sqft = metro median). Beds/baths reserved for future.")
+    st.sidebar.caption(
+        "ZIP → metro via pgeocode. No metro match? Uses national average. "
+        "Or select metro directly for 660+ areas."
+    )
 
 
 if __name__ == "__main__":
