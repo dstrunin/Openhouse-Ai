@@ -101,13 +101,17 @@ def main():
                 mortgage_rate = float(row["mortgage_rate"])
                 inventory = float(row["inventory"])
 
-                # Valuation
-                predicted_resale = valuation.predict_for_metro(metro, date, mortgage_rate, inventory)
-                # Liquidity (assume priced at median for MVP)
-                expected_hold_days = liquidity.predict_for_metro(
+                # Valuation: metro median scaled by property size (baseline 2000 sqft = typical US home)
+                metro_median = valuation.predict_for_metro(metro, date, mortgage_rate, inventory)
+                sqft_factor = sqft / 2000  # 2000 sqft = 1.0x (US median home size)
+                predicted_resale = metro_median * sqft_factor
+                # Liquidity: larger homes may sit longer; slight adjustment by size
+                base_hold_days = liquidity.predict_for_metro(
                     metro, date, mortgage_rate, inventory, price_relative_to_median=1.0
                 )
-
+                # Larger homes typically take longer to sell (~5% per 1000 sqft above 2000)
+                size_hold_factor = 1 + 0.05 * ((sqft - 2000) / 1000)
+                expected_hold_days = max(1, base_hold_days * size_hold_factor)
                 # Offer Engine
                 result = engine.compute(predicted_resale, expected_hold_days)
 
@@ -141,7 +145,7 @@ def main():
                 else:
                     st.warning("No — offer would be negative or unprofitable.")
 
-    st.sidebar.caption("MVP: Uses metro-level data. Beds/baths/sqft reserved for future property-level model.")
+    st.sidebar.caption("Valuation scales by sqft (2000 sqft = metro median). Beds/baths reserved for future.")
 
 
 if __name__ == "__main__":
