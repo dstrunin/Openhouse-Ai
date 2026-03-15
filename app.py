@@ -1,6 +1,6 @@
 """
 Openhouse-Ai: iBuyer profitability checker.
-Enter a property (city, beds, baths, sqft) → get full iBuyer decision.
+Enter a property (ZIP code, beds, baths, sqft) → get full iBuyer decision.
 """
 
 from pathlib import Path
@@ -24,6 +24,44 @@ def load_config():
         return yaml.safe_load(f)
 
 
+@st.cache_resource
+def _get_zip_lookup():
+    import pgeocode
+    return pgeocode.Nominatim("us")
+
+
+def resolve_metro_from_zip(zip_code: str, available_metros: list[str]) -> tuple[str | None, str | None]:
+    """
+    Look up ZIP code and return (metro, location_display) or (None, None) if not found.
+    location_display is e.g. "ZIP 78701 (Austin, TX)" for the output.
+    """
+    zip_code = zip_code.strip().replace("-", "").replace(" ", "")
+    if len(zip_code) != 5 or not zip_code.isdigit():
+        return None, None
+    try:
+        nomi = _get_zip_lookup()
+        result = nomi.query_postal_code(zip_code)
+        if result is None or pd.isna(result.get("place_name")):
+            return None, None
+        place = str(result["place_name"]).strip()
+        state = str(result["state_code"]).strip() if "state_code" in result else ""
+        if not place or not state:
+            return None, None
+        city_state = f"{place}, {state}"
+        # Try exact match first
+        for m in available_metros:
+            if city_state == m:
+                return m, f"ZIP {zip_code} ({city_state})"
+        # Fuzzy: metro contains city name
+        place_lower = place.lower()
+        for m in available_metros:
+            if place_lower in m.lower():
+                return m, f"ZIP {zip_code} ({city_state})"
+        return None, f"ZIP {zip_code} ({city_state})"
+    except Exception:
+        return None, None
+
+
 def validate_property(beds: int, baths: float, sqft: int) -> list[str]:
     """Return list of validation errors. Empty if valid."""
     errors = []
@@ -39,22 +77,6 @@ def validate_property(beds: int, baths: float, sqft: int) -> list[str]:
     if sqft_per_bed > 800:
         errors.append(f"{sqft_per_bed:.0f} sqft per bedroom — unusually large. Check your numbers.")
     return errors
-
-
-def resolve_metro(city: str, config: dict, available_metros: list[str]) -> str | None:
-    """Map user city input to metro. Returns None if not found."""
-    city_lower = city.strip().lower()
-    # Config mapping
-    mapping = config.get("city_to_metro", {})
-    if city_lower in mapping:
-        metro = mapping[city_lower]
-        if metro in available_metros:
-            return metro
-    # Fuzzy: find metro containing city name
-    for m in available_metros:
-        if city_lower in m.lower():
-            return m
-    return None
 
 
 @st.cache_resource
@@ -98,25 +120,26 @@ def main():
 
     # Inputs
     st.sidebar.header("Property Inputs")
-    city = st.sidebar.text_input("City", placeholder="e.g. Austin, Chicago")
+    zip_code = st.sidebar.text_input("ZIP Code", placeholder="e.g. 78701, 10001", max_chars=10)
     beds = st.sidebar.number_input("Beds", min_value=1, max_value=8, value=3, help="1–8 bedrooms")
     baths = st.sidebar.number_input("Baths", min_value=0.5, max_value=8.0, value=2.0, step=0.5, help="0.5–8 bathrooms")
     sqft = st.sidebar.number_input("Sqft", min_value=400, max_value=15000, value=1800, step=100, help="400–15,000 sqft")
 
     if st.sidebar.button("Get iBuyer Decision"):
-        if not city:
-            st.warning("Enter a city.")
+        if not zip_code or not zip_code.strip():
+            st.warning("Enter a ZIP code.")
         else:
             validation_errors = validate_property(int(beds), baths, sqft)
             if validation_errors:
                 for err in validation_errors:
                     st.error(err)
             else:
-                metro = resolve_metro(city, config, available_metros)
+                metro, location_display = resolve_metro_from_zip(zip_code, available_metros)
                 if not metro:
-                    st.error(
-                        f"City '{city}' not found. Try: {', '.join(available_metros[:10])}..."
-                    )
+                    if location_display:
+                        st.error(f"{location_display} — no metro data for this area. Try a major metro ZIP.")
+                    else:
+                        st.error("Invalid or unknown ZIP code. Enter a valid 5-digit US ZIP.")
                 else:
                     row = latest[latest["metro"] == metro].iloc[0]
                     date = pd.to_datetime(row["date"])
@@ -139,7 +162,7 @@ def main():
 
                     # Display property inputs
                     st.write("**Property**")
-                    st.write(f"{metro} · {int(beds)} beds · {baths} baths · {sqft:,} sqft")
+                    st.write(f"{location_display or metro} · {int(beds)} beds · {baths} baths · {sqft:,} sqft")
                     st.divider()
 
                     # Display
