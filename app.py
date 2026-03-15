@@ -24,6 +24,23 @@ def load_config():
         return yaml.safe_load(f)
 
 
+def validate_property(beds: int, baths: float, sqft: int) -> list[str]:
+    """Return list of validation errors. Empty if valid."""
+    errors = []
+    # Baths vs beds: typically 0.5-1.5 baths per bedroom
+    if baths < beds * 0.3:
+        errors.append(f"Too few bathrooms ({baths}) for {beds} bedrooms. Expect at least {beds * 0.5:.1f} baths.")
+    if baths > beds + 2:
+        errors.append(f"Too many bathrooms ({baths}) for {beds} bedrooms. Unusual for a single-family home.")
+    # Sqft per bedroom: typically 150-600 sqft
+    sqft_per_bed = sqft / beds
+    if sqft_per_bed < 120:
+        errors.append(f"Only {sqft_per_bed:.0f} sqft per bedroom — unusually small. Check your numbers.")
+    if sqft_per_bed > 800:
+        errors.append(f"{sqft_per_bed:.0f} sqft per bedroom — unusually large. Check your numbers.")
+    return errors
+
+
 def resolve_metro(city: str, config: dict, available_metros: list[str]) -> str | None:
     """Map user city input to metro. Returns None if not found."""
     city_lower = city.strip().lower()
@@ -82,68 +99,73 @@ def main():
     # Inputs
     st.sidebar.header("Property Inputs")
     city = st.sidebar.text_input("City", placeholder="e.g. Austin, Chicago")
-    beds = st.sidebar.number_input("Beds", min_value=1, max_value=10, value=3)
-    baths = st.sidebar.number_input("Baths", min_value=1.0, max_value=10.0, value=2.0, step=0.5)
-    sqft = st.sidebar.number_input("Sqft", min_value=100, max_value=20000, value=1800)
+    beds = st.sidebar.number_input("Beds", min_value=1, max_value=8, value=3, help="1–8 bedrooms")
+    baths = st.sidebar.number_input("Baths", min_value=0.5, max_value=8.0, value=2.0, step=0.5, help="0.5–8 bathrooms")
+    sqft = st.sidebar.number_input("Sqft", min_value=400, max_value=15000, value=1800, step=100, help="400–15,000 sqft")
 
     if st.sidebar.button("Get iBuyer Decision"):
         if not city:
             st.warning("Enter a city.")
         else:
-            metro = resolve_metro(city, config, available_metros)
-            if not metro:
-                st.error(
-                    f"City '{city}' not found. Try: {', '.join(available_metros[:10])}..."
-                )
+            validation_errors = validate_property(int(beds), baths, sqft)
+            if validation_errors:
+                for err in validation_errors:
+                    st.error(err)
             else:
-                row = latest[latest["metro"] == metro].iloc[0]
-                date = pd.to_datetime(row["date"])
-                mortgage_rate = float(row["mortgage_rate"])
-                inventory = float(row["inventory"])
-
-                # Valuation: metro median scaled by property size (baseline 2000 sqft = typical US home)
-                metro_median = valuation.predict_for_metro(metro, date, mortgage_rate, inventory)
-                sqft_factor = sqft / 2000  # 2000 sqft = 1.0x (US median home size)
-                predicted_resale = metro_median * sqft_factor
-                # Liquidity: larger homes may sit longer; slight adjustment by size
-                base_hold_days = liquidity.predict_for_metro(
-                    metro, date, mortgage_rate, inventory, price_relative_to_median=1.0
-                )
-                # Larger homes typically take longer to sell (~5% per 1000 sqft above 2000)
-                size_hold_factor = 1 + 0.05 * ((sqft - 2000) / 1000)
-                expected_hold_days = max(1, base_hold_days * size_hold_factor)
-                # Offer Engine
-                result = engine.compute(predicted_resale, expected_hold_days)
-
-                # Display property inputs
-                st.write("**Property**")
-                st.write(f"{metro} · {int(beds)} beds · {baths} baths · {sqft:,} sqft")
-                st.divider()
-
-                # Display
-                st.success("**iBuyer Decision**" if result.is_profitable else "**iBuyer Decision**")
-                col1, col2, col3 = st.columns(3)
-                with col1:
-                    st.metric("Offer Price", f"${result.offer_price:,.0f}")
-                    st.caption("Max iBuyer would pay")
-                with col2:
-                    st.metric("Expected Profit", f"${result.expected_profit:,.0f}")
-                    st.caption("Target margin (5%)")
-                with col3:
-                    st.metric("Expected Hold", f"{result.expected_hold_days:.0f} days")
-                    st.caption("Time to sell")
-
-                st.divider()
-                st.write("**Breakdown**")
-                st.write(f"- Predicted resale: ${result.predicted_resale:,.0f}")
-                st.write(f"- Transaction cost (8%): ${result.transaction_cost:,.0f}")
-                st.write(f"- Holding cost ({result.expected_hold_days:.0f} × $150): ${result.holding_cost:,.0f}")
-                st.write(f"- Risk margin (5%): ${result.risk_margin:,.0f}")
-
-                if result.is_profitable:
-                    st.success("Yes — iBuyer would make money.")
+                metro = resolve_metro(city, config, available_metros)
+                if not metro:
+                    st.error(
+                        f"City '{city}' not found. Try: {', '.join(available_metros[:10])}..."
+                    )
                 else:
-                    st.warning("No — offer would be negative or unprofitable.")
+                    row = latest[latest["metro"] == metro].iloc[0]
+                    date = pd.to_datetime(row["date"])
+                    mortgage_rate = float(row["mortgage_rate"])
+                    inventory = float(row["inventory"])
+
+                    # Valuation: metro median scaled by property size (baseline 2000 sqft = typical US home)
+                    metro_median = valuation.predict_for_metro(metro, date, mortgage_rate, inventory)
+                    sqft_factor = sqft / 2000  # 2000 sqft = 1.0x (US median home size)
+                    predicted_resale = metro_median * sqft_factor
+                    # Liquidity: larger homes may sit longer; slight adjustment by size
+                    base_hold_days = liquidity.predict_for_metro(
+                        metro, date, mortgage_rate, inventory, price_relative_to_median=1.0
+                    )
+                    # Larger homes typically take longer to sell (~5% per 1000 sqft above 2000)
+                    size_hold_factor = 1 + 0.05 * ((sqft - 2000) / 1000)
+                    expected_hold_days = max(1, base_hold_days * size_hold_factor)
+                    # Offer Engine
+                    result = engine.compute(predicted_resale, expected_hold_days)
+
+                    # Display property inputs
+                    st.write("**Property**")
+                    st.write(f"{metro} · {int(beds)} beds · {baths} baths · {sqft:,} sqft")
+                    st.divider()
+
+                    # Display
+                    st.success("**iBuyer Decision**" if result.is_profitable else "**iBuyer Decision**")
+                    col1, col2, col3 = st.columns(3)
+                    with col1:
+                        st.metric("Offer Price", f"${result.offer_price:,.0f}")
+                        st.caption("Max iBuyer would pay")
+                    with col2:
+                        st.metric("Expected Profit", f"${result.expected_profit:,.0f}")
+                        st.caption("Target margin (5%)")
+                    with col3:
+                        st.metric("Expected Hold", f"{result.expected_hold_days:.0f} days")
+                        st.caption("Time to sell")
+
+                    st.divider()
+                    st.write("**Breakdown**")
+                    st.write(f"- Predicted resale: ${result.predicted_resale:,.0f}")
+                    st.write(f"- Transaction cost (8%): ${result.transaction_cost:,.0f}")
+                    st.write(f"- Holding cost ({result.expected_hold_days:.0f} × $150): ${result.holding_cost:,.0f}")
+                    st.write(f"- Risk margin (5%): ${result.risk_margin:,.0f}")
+
+                    if result.is_profitable:
+                        st.success("Yes — iBuyer would make money.")
+                    else:
+                        st.warning("No — offer would be negative or unprofitable.")
 
     st.sidebar.caption("Valuation scales by sqft (2000 sqft = metro median). Beds/baths reserved for future.")
 
