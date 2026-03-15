@@ -1,0 +1,45 @@
+# Data paths
+data_dir: data
+raw_dir: data/raw
+processed_dir: data/processed
+
+# Offer Engine parameters
+transaction_cost_pct: 0.08
+holding_cost_per_day: 150
+risk_margin_pct: 0.05
+
+# City to metro mapping (common aliases)
+city_to_metro:
+  austin: "Austin, TX"
+  new york: "New York, NY"
+  los angeles: "Los Angeles, CA"
+  chicago: "Chicago, IL"
+  houston: "Houston, TX"
+  phoenix: "Phoenix, AZ"
+  philadelphia: "Philadelphia, PA"
+  san antonio: "San Antonio, TX"
+  san diego: "San Diego, CA"
+  dallas: "Dallas, TX"
+  san jose: "San Jose, CA"
+  miami: "Miami, FL"
+  atlanta: "Atlanta, GA"
+  boston: "Boston, MA"
+  san francisco: "San Francisco, CA"
+  denver: "Denver, CO"
+  seattle: "Seattle, WA"
+  portland: "Portland, OR"
+  detroit: "Detroit, MI"
+  minneapolis: "Minneapolis, MN"
+  tampa: "Tampa, FL"
+  orlando: "Orlando, FL"
+  las vegas: "Las Vegas, NV"
+  charlotte: "Charlotte, NC"
+  raleigh: "Raleigh, NC"
+  nashville: "Nashville, TN"
+  indianapolis: "Indianapolis, IN"
+  columbus: "Columbus, OH"
+  milwaukee: "Milwaukee, WI"
+  kansas city: "Kansas City, MO"
+  salt lake city: "Salt Lake City, UT"
+  sacramento: "Sacramento, CA"
+  riverside: "Riverside, CA"
