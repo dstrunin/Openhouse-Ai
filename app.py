@@ -137,3 +137,7 @@ def main():
                     st.warning("No — offer would be negative or unprofitable.")
 
     st.sidebar.caption("MVP: Uses metro-level data. Beds/baths/sqft reserved for future property-level model.")
+
+
+if __name__ == "__main__":
+    main()
