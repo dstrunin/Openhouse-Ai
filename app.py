@@ -111,6 +111,11 @@ def main():
                 # Offer Engine
                 result = engine.compute(predicted_resale, expected_hold_days)
 
+                # Display property inputs
+                st.write("**Property**")
+                st.write(f"{metro} · {int(beds)} beds · {baths} baths · {sqft:,} sqft")
+                st.divider()
+
                 # Display
                 st.success("**iBuyer Decision**" if result.is_profitable else "**iBuyer Decision**")
                 col1, col2, col3 = st.columns(3)
