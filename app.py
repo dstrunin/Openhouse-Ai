@@ -96,16 +96,10 @@ def validate_property(beds: int, baths: float, sqft: int) -> list[str]:
 
 @st.cache_resource
 def load_models():
-    """Load trained models (cached)."""
+    """Load trained models (cached). Reserved for future forecasting in the UI."""
     valuation = ValuationModel().load(MODELS_DIR / "valuation")
     liquidity = LiquidityModel().load(MODELS_DIR / "liquidity")
-    config = load_config()
-    engine = OfferEngine(
-        transaction_cost_pct=config.get("transaction_cost_pct", 0.08),
-        holding_cost_per_day=config.get("holding_cost_per_day", 150),
-        risk_margin_pct=config.get("risk_margin_pct", 0.05),
-    )
-    return valuation, liquidity, engine
+    return valuation, liquidity
 
 
 def main():
@@ -119,7 +113,7 @@ def main():
         st.error("Run `python train.py` first to generate data.")
         return
 
-    _, _, engine = load_models()
+    load_models()  # warm cache; models not used in live numbers yet
     config = load_config()
 
     # Load latest metro data (must have days_on_market — re-run train.py if missing)
@@ -149,6 +143,38 @@ def main():
     beds = st.sidebar.number_input("Beds", min_value=1, max_value=8, value=3, help="1–8 bedrooms")
     baths = st.sidebar.number_input("Baths", min_value=0.5, max_value=8.0, value=2.0, step=0.5, help="0.5–8 bathrooms")
     sqft = st.sidebar.number_input("Sqft", min_value=400, max_value=15000, value=1800, step=100, help="400–15,000 sqft")
+
+    st.sidebar.subheader("Offer assumptions")
+    st.sidebar.caption("Defaults from `configs/settings.yaml`. Adjust to stress-test.")
+    _def_tc = float(config.get("transaction_cost_pct", 0.08))
+    _def_hold = float(config.get("holding_cost_per_day", 150))
+    _def_risk = float(config.get("risk_margin_pct", 0.05))
+    trans_pct = st.sidebar.slider(
+        "Transaction cost (% of resale estimate)",
+        min_value=0.5,
+        max_value=25.0,
+        value=round(_def_tc * 100, 1),
+        step=0.5,
+        help="Fees, closing, commissions as a percent of the ZHVI-based estimate.",
+    )
+    transaction_cost_pct = trans_pct / 100.0
+    holding_per_day = st.sidebar.slider(
+        "Holding cost ($ / day)",
+        min_value=0.0,
+        max_value=500.0,
+        value=float(_def_hold),
+        step=5.0,
+        help="Carry cost while the iBuyer holds the home.",
+    )
+    risk_pct_ui = st.sidebar.slider(
+        "Risk margin (% of resale estimate)",
+        min_value=0.5,
+        max_value=20.0,
+        value=round(_def_risk * 100, 1),
+        step=0.5,
+        help="Target profit buffer; shown as expected profit in this simple model.",
+    )
+    risk_margin_pct = risk_pct_ui / 100.0
 
     if st.sidebar.button("Get iBuyer Decision"):
         if input_mode == "Select Metro" and not metro_override:
@@ -190,7 +216,11 @@ def main():
                     # Larger homes typically take longer to sell (~5% per 1000 sqft above 2000)
                     size_hold_factor = 1 + 0.05 * ((sqft - 2000) / 1000)
                     expected_hold_days = max(1, base_hold_days * size_hold_factor)
-                    # Offer Engine
+                    engine = OfferEngine(
+                        transaction_cost_pct=transaction_cost_pct,
+                        holding_cost_per_day=holding_per_day,
+                        risk_margin_pct=risk_margin_pct,
+                    )
                     result = engine.compute(zhvi_resale_estimate, expected_hold_days)
 
                     # Display property inputs
@@ -222,17 +252,29 @@ def main():
                         st.caption("From ZHVI-based estimate")
                     with col2:
                         st.metric("Expected Profit", f"${result.expected_profit:,.0f}")
-                        st.caption("Target margin (5%)")
+                        st.caption(f"Target margin ({risk_pct_ui:.1f}%)")
                     with col3:
                         st.metric("Expected Hold", f"{result.expected_hold_days:.0f} days")
                         st.caption("Time to sell")
 
+                    st.caption(
+                        f"Assumptions for this run: **{trans_pct:.1f}%** transaction · "
+                        f"**${holding_per_day:,.0f}/day** hold · **{risk_pct_ui:.1f}%** risk on estimate"
+                    )
+
                     st.divider()
                     st.write("**Breakdown** (all $ amounts use the ZHVI-based resale estimate above)")
                     st.write(f"- ZHVI-based resale estimate: ${result.predicted_resale:,.0f}")
-                    st.write(f"- Transaction cost (8% of estimate): ${result.transaction_cost:,.0f}")
-                    st.write(f"- Holding cost ({result.expected_hold_days:.0f} × $150): ${result.holding_cost:,.0f}")
-                    st.write(f"- Risk margin (5% of estimate): ${result.risk_margin:,.0f}")
+                    st.write(
+                        f"- Transaction cost ({trans_pct:.1f}% of estimate): ${result.transaction_cost:,.0f}"
+                    )
+                    st.write(
+                        f"- Holding cost ({result.expected_hold_days:.0f} days × ${holding_per_day:,.0f}/day): "
+                        f"${result.holding_cost:,.0f}"
+                    )
+                    st.write(
+                        f"- Risk margin ({risk_pct_ui:.1f}% of estimate): ${result.risk_margin:,.0f}"
+                    )
 
                     if result.is_profitable:
                         st.success("Yes — iBuyer would make money.")
