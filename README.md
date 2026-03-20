@@ -6,6 +6,8 @@
 
 *Inspired by Opendoor's iBuying model and the challenge of profitable instant home buying*
 
+**GitHub “About”** (description, website, topics): copy-paste / `gh` commands in [`.github/GITHUB_ABOUT.md`](.github/GITHUB_ABOUT.md).
+
 ## Quick Start
 
 ```bash
