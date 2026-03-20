@@ -1,6 +1,7 @@
 """
 Offer Engine: iBuyer logic.
-offer = predicted_resale - transaction_cost - holding_cost - risk_margin
+Uses a ZHVI-based resale estimate (typical home value), not median sale price.
+offer = resale_estimate - transaction_cost - holding_cost - risk_margin
 Output: offer_price, expected_profit
 """
 
@@ -11,7 +12,7 @@ from dataclasses import dataclass
 class OfferResult:
     offer_price: float
     expected_profit: float
-    predicted_resale: float
+    predicted_resale: float  # ZHVI-based resale estimate passed in from the app
     expected_hold_days: float
     transaction_cost: float
     holding_cost: float
@@ -34,7 +35,7 @@ class OfferEngine:
 
     def compute(self, predicted_resale: float, expected_hold_days: float) -> OfferResult:
         """
-        offer = predicted_resale - transaction_cost - holding_cost - risk_margin
+        predicted_resale: ZHVI-based resale estimate ($), already scaled by property sqft in the app.
         """
         transaction_cost = self.transaction_cost_pct * predicted_resale
         holding_cost = self.holding_cost_per_day * expected_hold_days

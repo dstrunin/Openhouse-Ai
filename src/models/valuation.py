@@ -1,6 +1,7 @@
 """
-Valuation Model: XGBoost predicting median_sale_price (predicted resale price).
-Features: mortgage_rate, inventory, seasonality, lagged prices.
+Valuation Model: XGBoost predicting ZHVI (stored as median_sale_price in the training table).
+Features: mortgage_rate, inventory, seasonality, lagged ZHVI.
+Not used for Streamlit spot estimates (app uses latest ZHVI directly).
 """
 
 from pathlib import Path
@@ -27,7 +28,7 @@ def _add_features(df: pd.DataFrame) -> pd.DataFrame:
 
 
 class ValuationModel:
-    """XGBoost model for predicting median resale price by metro."""
+    """XGBoost model for predicting metro ZHVI (target column: median_sale_price)."""
 
     FEATURES = ["mortgage_rate", "inventory", "season_sin", "season_cos", "price_lag_1", "price_lag_2", "price_lag_3"]
     TARGET = "median_sale_price"

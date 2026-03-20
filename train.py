@@ -32,7 +32,7 @@ def main():
     liquidity.save(models_dir / "liquidity")
     print("  Saved.")
 
-    # Latest row per metro for Streamlit (ZHVI + days on market; app uses this directly)
+    # Latest row per metro: ZHVI in column median_sale_price; app labels this clearly in the UI
     latest = df.sort_values("date", ascending=False).groupby("metro").first().reset_index()
     national_row = pd.DataFrame([{
         "metro": "National",

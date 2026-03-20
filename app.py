@@ -115,6 +115,10 @@ def main():
     available_metros = latest["metro"].tolist()
     data_as_of = pd.to_datetime(latest["date"]).max()
     st.caption(f"Data as of {data_as_of.strftime('%B %Y')} · Zillow Research")
+    st.caption(
+        "Prices use ZHVI (Zillow Home Value Index): typical home value for the metro, "
+        "not median sale price. Scaled by sqft (2,000 sqft = metro typical)."
+    )
 
     # Inputs
     st.sidebar.header("Property Inputs")
@@ -158,16 +162,16 @@ def main():
                         use_national_fallback = False
                 if metro:
                     row = latest[latest["metro"] == metro].iloc[0]
-                    # Use latest data directly (Zillow ZHVI + days on market) — models were under-predicting
-                    metro_median = float(row["median_sale_price"])
+                    # Latest ZHVI for metro (column name in parquet is legacy: median_sale_price)
+                    metro_zhvi = float(row["median_sale_price"])
                     base_hold_days = float(row["days_on_market"])
-                    sqft_factor = sqft / 2000  # 2000 sqft = 1.0x (US median home size)
-                    predicted_resale = metro_median * sqft_factor
+                    sqft_factor = sqft / 2000  # 2,000 sqft = 1.0× metro typical (ZHVI)
+                    zhvi_resale_estimate = metro_zhvi * sqft_factor
                     # Larger homes typically take longer to sell (~5% per 1000 sqft above 2000)
                     size_hold_factor = 1 + 0.05 * ((sqft - 2000) / 1000)
                     expected_hold_days = max(1, base_hold_days * size_hold_factor)
                     # Offer Engine
-                    result = engine.compute(predicted_resale, expected_hold_days)
+                    result = engine.compute(zhvi_resale_estimate, expected_hold_days)
 
                     # Display property inputs
                     st.write("**Property**")
@@ -181,7 +185,7 @@ def main():
                     col1, col2, col3 = st.columns(3)
                     with col1:
                         st.metric("Offer Price", f"${result.offer_price:,.0f}")
-                        st.caption("Max iBuyer would pay")
+                        st.caption("From ZHVI-based estimate")
                     with col2:
                         st.metric("Expected Profit", f"${result.expected_profit:,.0f}")
                         st.caption("Target margin (5%)")
@@ -190,11 +194,11 @@ def main():
                         st.caption("Time to sell")
 
                     st.divider()
-                    st.write("**Breakdown**")
-                    st.write(f"- Predicted resale: ${result.predicted_resale:,.0f}")
-                    st.write(f"- Transaction cost (8%): ${result.transaction_cost:,.0f}")
+                    st.write("**Breakdown** (all $ amounts use the ZHVI-based resale estimate above)")
+                    st.write(f"- ZHVI-based resale estimate: ${result.predicted_resale:,.0f}")
+                    st.write(f"- Transaction cost (8% of estimate): ${result.transaction_cost:,.0f}")
                     st.write(f"- Holding cost ({result.expected_hold_days:.0f} × $150): ${result.holding_cost:,.0f}")
-                    st.write(f"- Risk margin (5%): ${result.risk_margin:,.0f}")
+                    st.write(f"- Risk margin (5% of estimate): ${result.risk_margin:,.0f}")
 
                     if result.is_profitable:
                         st.success("Yes — iBuyer would make money.")
@@ -202,7 +206,7 @@ def main():
                         st.warning("No — offer would be negative or unprofitable.")
 
     st.sidebar.caption(
-        "Data: Zillow ZHVI (typical home value) + days on market. "
+        "ZHVI = typical home value index, not median sale price. "
         "ZIP → metro via pgeocode; or select metro for 660+ areas."
     )
 

@@ -1,6 +1,9 @@
 """
 Build the single training table from Zillow + FRED data.
-Output: date, metro, median_sale_price, days_on_market, inventory, mortgage_rate
+
+Note: The column ``median_sale_price`` holds **Zillow ZHVI** (typical home value index),
+not recorded median sale price — kept under this name for historical pipeline compatibility.
+Output: date, metro, median_sale_price (ZHVI), days_on_market, inventory, mortgage_rate
 """
 
 import os
@@ -88,7 +91,7 @@ def build_training_table(
     zhvi_path: str | Path | None = None,
 ) -> pd.DataFrame:
     """
-    Build single training table: date, metro, median_sale_price, days_on_market, inventory, mortgage_rate.
+    Build single training table: date, metro, zhvi-as-median_sale_price, days_on_market, inventory, mortgage_rate.
     """
     data_dir = Path(data_dir)
     raw_dir = data_dir / "raw"
@@ -96,7 +99,7 @@ def build_training_table(
     raw_dir.mkdir(parents=True, exist_ok=True)
     processed_dir.mkdir(parents=True, exist_ok=True)
 
-    # 1. ZHVI (median_sale_price proxy)
+    # 1. ZHVI — stored as column median_sale_price for compatibility
     zhvi_path = zhvi_path or data_dir / "Metro_zhvi_uc_sfrcondo_tier_0.33_0.67_sm_sa_month.csv"
     zhvi = pd.read_csv(zhvi_path)
     zhvi = zhvi[zhvi["RegionType"] == "msa"].copy()

@@ -2,6 +2,8 @@
 
 **MVP:** If an iBuyer bought this house today, would they make money?
 
+**Important:** Dollar amounts are built from **Zillow ZHVI** (typical home value for the metro), scaled by your sqft — **not** median sale price or a Zestimate for one address.
+
 *Inspired by Opendoor's iBuying model and the challenge of profitable instant home buying*
 
 ## Quick Start
@@ -28,7 +30,7 @@ Enter a ZIP or metro, beds, baths, sqft → get full iBuyer decision.
 ```
 Data (Zillow ZHVI, days on market, inventory + FRED mortgage rate)
   ↓
-Latest metro row (Streamlit) → resale estimate scaled by sqft, hold time from data
+Latest metro ZHVI (Streamlit) → resale-style estimate scaled by sqft; hold time from Zillow days-on-market data
   ↓
 Valuation & Liquidity models (XGBoost) — trained for future use / research
   ↓
@@ -40,7 +42,7 @@ Streamlit UI
 ## Key Features
 
 - **Market data**: Latest Zillow ZHVI and days on market per metro (plus national fallback)
-- **Offer math**: Transaction cost, holding cost, and risk margin on predicted resale
+- **Offer math**: Transaction cost, holding cost, and risk margin on the ZHVI-based resale estimate
 - **ZIP or metro**: pgeocode lookup or pick from 660+ metros
 
 ## Data Sources
@@ -72,7 +74,7 @@ No secrets needed — the app uses pre-trained models in the repo.
 ## Data Coverage
 
 - **660+ metros** from Zillow Research: ZHVI (typical home value), days on market, inventory
-- **Direct data** — uses latest Zillow values (no model prediction for current valuation)
+- **Direct data** — latest ZHVI + days on market (no model for the live number shown in the app)
 - **ZIP lookup** via pgeocode → city/state → metro match
 - **National fallback** when ZIP has no metro data
 - **Metro selector** — pick from 660+ metros directly
