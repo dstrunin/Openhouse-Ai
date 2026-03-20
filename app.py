@@ -9,6 +9,7 @@ import pandas as pd
 import streamlit as st
 import yaml
 
+from src.geo.zip_metro import county_fips_from_pgeocode, resolve_metro_for_zip
 from src.models import LiquidityModel, ValuationModel
 from src.simulation import OfferEngine
 
@@ -30,6 +31,16 @@ def _get_zip_lookup():
     return pgeocode.Nominatim("us")
 
 
+@st.cache_resource
+def _fips_to_cbsa_title() -> dict[int, str]:
+    """County FIPS → Census CBSA Title (2020 delineation). Empty if parquet missing."""
+    path = DATA_DIR / "geo" / "fips_to_cbsa.parquet"
+    if not path.exists():
+        return {}
+    df = pd.read_parquet(path)
+    return dict(zip(df["fips"].astype(int), df["CBSA Title"].astype(str)))
+
+
 def resolve_metro_from_zip(zip_code: str, available_metros: list[str]) -> tuple[str | None, str | None]:
     """
     Look up ZIP code and return (metro, location_display) or (None, None) if not found.
@@ -47,17 +58,12 @@ def resolve_metro_from_zip(zip_code: str, available_metros: list[str]) -> tuple[
         state = str(result["state_code"]).strip() if "state_code" in result else ""
         if not place or not state:
             return None, None
-        city_state = f"{place}, {state}"
-        # Try exact match first
-        for m in available_metros:
-            if city_state == m:
-                return m, f"ZIP {zip_code} ({city_state})"
-        # Fuzzy: metro contains city name
-        place_lower = place.lower()
-        for m in available_metros:
-            if place_lower in m.lower():
-                return m, f"ZIP {zip_code} ({city_state})"
-        return None, f"ZIP {zip_code} ({city_state})"
+        county_code = result.get("county_code")
+        fips_map = _fips_to_cbsa_title()
+        metro, display = resolve_metro_for_zip(
+            zip_code, place, state, county_code, available_metros, fips_map
+        )
+        return metro, display
     except Exception:
         return None, None
 
@@ -207,7 +213,7 @@ def main():
 
     st.sidebar.caption(
         "ZHVI = typical home value index, not median sale price. "
-        "ZIP → metro via pgeocode; or select metro for 660+ areas."
+        "ZIP → metro: county FIPS + Census CBSA, then pgeocode city match; or pick a metro."
     )
 
 

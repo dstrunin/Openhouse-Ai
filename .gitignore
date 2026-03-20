@@ -19,6 +19,7 @@ build/
 
 # Data - exclude raw downloads, keep processed for deployment
 data/raw/
+data/geo/_list1_2020.xls
 
 # Env
 .env

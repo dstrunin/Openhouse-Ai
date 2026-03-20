@@ -43,39 +43,52 @@ Streamlit UI
 
 - **Market data**: Latest Zillow ZHVI and days on market per metro (plus national fallback)
 - **Offer math**: Transaction cost, holding cost, and risk margin on the ZHVI-based resale estimate
-- **ZIP or metro**: pgeocode lookup or pick from 660+ metros
+- **ZIP or metro**: county FIPS + Census CBSA (2020) + pgeocode, or pick from 660+ metros
 
 ## Data Sources
 
 - **ZHVI, days on market, inventory:** Zillow Research (auto-downloaded)
 - **Mortgage rate:** FRED (MORTGAGE30US) or Freddie Mac PMMS CSV fallback
+- **ZIP → CBSA:** U.S. Census Bureau 2020 CBSA county delineation (`data/geo/fips_to_cbsa.parquet`). Regenerate with `python scripts/build_fips_cbsa_crosswalk.py` (needs `xlrd` for the `.xls` file).
 
 ## Deploy to Streamlit Cloud
 
-1. **Push to GitHub** (models must be committed):
-   ```bash
-   git init
-   git add .
-   git commit -m "Initial commit"
-   git branch -M main
-   git remote add origin https://github.com/YOUR_USERNAME/Openhouse-Ai.git
-   git push -u origin main
-   ```
+**Pre-flight (local):**
 
-2. **Deploy on Streamlit Cloud:**
-   - Go to [share.streamlit.io](https://share.streamlit.io)
-   - Sign in with GitHub
-   - Click "New app" → select `Openhouse-Ai` repo
-   - Main file: `app.py`
-   - Click "Deploy"
+```bash
+.venv/bin/python scripts/smoke_zip_resolution.py   # ZIP → metro sanity check
+.venv/bin/streamlit run app.py                     # click through one ZIP + one metro
+```
 
-No secrets needed — the app uses pre-trained models in the repo.
+**Commit everything the app needs** (Streamlit Cloud does not run `train.py` for you):
+
+- `data/processed/latest_by_metro.parquet` and model dirs under `data/processed/models/`
+- `data/geo/fips_to_cbsa.parquet` (Census crosswalk; do **not** commit `data/geo/_list1_2020.xls`)
+
+**Push to GitHub**
+
+```bash
+git add -A
+git status    # confirm no secrets / huge raw files
+git commit -m "Your message"
+git push origin main
+```
+
+*(New repo? `git init`, `git remote add origin …`, then push as above.)*
+
+**Streamlit Cloud**
+
+1. [share.streamlit.io](https://share.streamlit.io) → **New app** → your repo
+2. Main file: `app.py` → **Deploy**
+3. Python version: match `runtime.txt` if present
+
+No API secrets are required for the deployed app (prebuilt data + models in the repo). You still need `FRED_API_KEY` locally if you run `train.py` to refresh data.
 
 ## Data Coverage
 
 - **660+ metros** from Zillow Research: ZHVI (typical home value), days on market, inventory
 - **Direct data** — latest ZHVI + days on market (no model for the live number shown in the app)
-- **ZIP lookup** via pgeocode → city/state → metro match
+- **ZIP lookup**: pgeocode → county FIPS → [Census CBSA delineation](https://www.census.gov/geographies/reference-files/time-series/demo/metro-micro/delineation-files.html) → Zillow metro name; fallback to city substring match
 - **National fallback** when ZIP has no metro data
 - **Metro selector** — pick from 660+ metros directly
 
