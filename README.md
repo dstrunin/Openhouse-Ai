@@ -10,6 +10,8 @@
 
 **GitHub “About”** (description, website, topics): copy-paste / `gh` commands in [`.github/GITHUB_ABOUT.md`](.github/GITHUB_ABOUT.md).
 
+[![Smoke tests](https://github.com/dstrunin/Openhouse-Ai/actions/workflows/smoke.yml/badge.svg)](https://github.com/dstrunin/Openhouse-Ai/actions/workflows/smoke.yml)
+
 ## Quick Start
 
 ```bash
@@ -87,6 +89,20 @@ git push origin main
 3. Python version: match `runtime.txt` if present
 
 No API secrets are required for the deployed app (prebuilt data + models in the repo). You still need `FRED_API_KEY` locally if you run `train.py` to refresh data.
+
+## Reliability & refreshing data
+
+**CI (GitHub Actions):** On every push and pull request to `main`, [`.github/workflows/smoke.yml`](.github/workflows/smoke.yml) installs deps and runs `scripts/smoke_zip_resolution.py` (ZIP → metro checks; uses network for pgeocode). You can also run it manually: **Actions → Smoke tests → Run workflow**.
+
+**Refreshing Zillow/mortgage data (local):**
+
+1. `export FRED_API_KEY=...` (see Quick Start).
+2. `.venv/bin/python train.py` — downloads Zillow series, refreshes `data/processed/latest_by_metro.parquet`, retrains models under `data/processed/models/`.
+3. Run `scripts/smoke_zip_resolution.py` after changes to geo or resolution logic.
+4. Commit the updated parquet(s) / model artifacts you want the **deployed** app to use, then `git push`.
+5. Streamlit Cloud redeploys from `main` (or trigger a redeploy in the dashboard).
+
+**ZIP → CBSA crosswalk only** (Census file changed / rebuild): `pip install xlrd` then `python scripts/build_fips_cbsa_crosswalk.py`, commit `data/geo/fips_to_cbsa.parquet` (not the cached `.xls`).
 
 ## Data Coverage
 
