@@ -113,6 +113,8 @@ def main():
         st.error("Re-run `python train.py` to regenerate data with days_on_market.")
         return
     available_metros = latest["metro"].tolist()
+    data_as_of = pd.to_datetime(latest["date"]).max()
+    st.caption(f"Data as of {data_as_of.strftime('%B %Y')} · Zillow Research")
 
     # Inputs
     st.sidebar.header("Property Inputs")
