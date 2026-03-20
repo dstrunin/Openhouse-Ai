@@ -32,13 +32,8 @@ class OfferEngine:
         self.holding_cost_per_day = holding_cost_per_day
         self.risk_margin_pct = risk_margin_pct
 
-    def compute(
-        self,
-        predicted_resale: float,
-        expected_hold_days: float,
-    ) -> OfferResult:
+    def compute(self, predicted_resale: float, expected_hold_days: float) -> OfferResult:
         """
-        Compute offer price and expected profit.
         offer = predicted_resale - transaction_cost - holding_cost - risk_margin
         """
         transaction_cost = self.transaction_cost_pct * predicted_resale
@@ -46,7 +41,7 @@ class OfferEngine:
         risk_margin = self.risk_margin_pct * predicted_resale
 
         offer_price = predicted_resale - transaction_cost - holding_cost - risk_margin
-        expected_profit = risk_margin  # By design, profit = risk margin when offer is accepted
+        expected_profit = risk_margin
 
         return OfferResult(
             offer_price=max(0, offer_price),

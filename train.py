@@ -5,6 +5,8 @@ Run once to build models before using the app.
 
 from pathlib import Path
 
+import pandas as pd
+
 from src.data_pipeline import build_training_table
 from src.models import LiquidityModel, ValuationModel
 
@@ -30,9 +32,8 @@ def main():
     liquidity.save(models_dir / "liquidity")
     print("  Saved.")
 
-    # Save latest metro data for inference (use data directly, not model predictions)
+    # Latest row per metro for Streamlit (ZHVI + days on market; app uses this directly)
     latest = df.sort_values("date", ascending=False).groupby("metro").first().reset_index()
-    # Add National fallback (average across metros) for ZIPs without metro data
     national_row = pd.DataFrame([{
         "metro": "National",
         "date": latest["date"].iloc[0],
@@ -48,3 +49,7 @@ def main():
     print("Saved latest_by_metro.parquet (with National fallback).")
 
     print("\nDone. Run: streamlit run app.py")
+
+
+if __name__ == "__main__":
+    main()

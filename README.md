@@ -2,6 +2,8 @@
 
 **MVP:** If an iBuyer bought this house today, would they make money?
 
+*Inspired by Opendoor's iBuying model and the challenge of profitable instant home buying*
+
 ## Quick Start
 
 ```bash
@@ -19,21 +21,27 @@ export FRED_API_KEY=your_key
 .venv/bin/streamlit run app.py
 ```
 
-Enter a city (e.g. Austin, Chicago), beds, baths, sqft → get full iBuyer decision.
+Enter a ZIP or metro, beds, baths, sqft → get full iBuyer decision.
 
 ## Architecture
 
 ```
 Data (Zillow ZHVI, days on market, inventory + FRED mortgage rate)
   ↓
-Valuation Model (XGBoost) → predicted resale price
+Latest metro row (Streamlit) → resale estimate scaled by sqft, hold time from data
   ↓
-Liquidity Model (XGBoost) → expected hold time
+Valuation & Liquidity models (XGBoost) — trained for future use / research
   ↓
 Offer Engine → offer price, expected profit
   ↓
 Streamlit UI
 ```
+
+## Key Features
+
+- **Market data**: Latest Zillow ZHVI and days on market per metro (plus national fallback)
+- **Offer math**: Transaction cost, holding cost, and risk margin on predicted resale
+- **ZIP or metro**: pgeocode lookup or pick from 660+ metros
 
 ## Data Sources
 
