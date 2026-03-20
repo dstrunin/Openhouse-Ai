@@ -43,7 +43,7 @@ Streamlit UI
 
 - **Market data**: Latest Zillow ZHVI and days on market per metro (plus national fallback)
 - **Offer math**: Transaction cost, holding cost, and risk margin on the ZHVI-based resale estimate
-- **ZIP or metro**: county FIPS + Census CBSA (2020) + pgeocode, or pick from 660+ metros
+- **ZIP or metro**: county FIPS + Census CBSA (2020) + pgeocode, or pick from 660+ metros; the UI notes when the ZIP’s postal city differs from the Zillow metro used for stats (e.g. Round Rock → Austin, TX)
 
 ## Data Sources
 

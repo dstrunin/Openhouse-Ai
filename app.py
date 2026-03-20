@@ -3,13 +3,14 @@ Openhouse-Ai: iBuyer profitability checker.
 Enter a property (ZIP code, beds, baths, sqft) → get full iBuyer decision.
 """
 
+import re
 from pathlib import Path
 
 import pandas as pd
 import streamlit as st
 import yaml
 
-from src.geo.zip_metro import county_fips_from_pgeocode, resolve_metro_for_zip
+from src.geo.zip_metro import resolve_metro_for_zip
 from src.models import LiquidityModel, ValuationModel
 from src.simulation import OfferEngine
 
@@ -66,6 +67,14 @@ def resolve_metro_from_zip(zip_code: str, available_metros: list[str]) -> tuple[
         return metro, display
     except Exception:
         return None, None
+
+
+def _postal_city_from_zip_line(location_display: str) -> str | None:
+    """Parse 'City, ST' from ``ZIP 12345 (City, ST)`` (optional `` (national average)`` suffix)."""
+    if not location_display:
+        return None
+    m = re.match(r"^ZIP \d{5} \(([^)]+)\)", location_display.strip())
+    return m.group(1).strip() if m else None
 
 
 def validate_property(beds: int, baths: float, sqft: int) -> list[str]:
@@ -167,6 +176,11 @@ def main():
                     else:
                         use_national_fallback = False
                 if metro:
+                    zip_postal_city = (
+                        _postal_city_from_zip_line(location_display)
+                        if input_mode == "ZIP Code" and not metro_override
+                        else None
+                    )
                     row = latest[latest["metro"] == metro].iloc[0]
                     # Latest ZHVI for metro (column name in parquet is legacy: median_sale_price)
                     metro_zhvi = float(row["median_sale_price"])
@@ -182,12 +196,26 @@ def main():
                     # Display property inputs
                     st.write("**Property**")
                     st.write(f"{location_display or metro} · {int(beds)} beds · {baths} baths · {sqft:,} sqft")
+                    if (
+                        not use_national_fallback
+                        and zip_postal_city
+                        and metro != "National"
+                        and zip_postal_city != metro
+                    ):
+                        st.caption(
+                            f"Market stats (ZHVI, days on market) use **{metro}**. "
+                            f"The postal place for this ZIP is **{zip_postal_city}**, which falls in that metro "
+                            "(Census CBSA / county)."
+                        )
                     if use_national_fallback:
-                        st.info("Metro-level data not available for this ZIP. Using national average — results are approximate.")
+                        st.info(
+                            "Metro-level data isn’t available for this ZIP in our dataset. "
+                            "Using **National** averages — treat results as rough."
+                        )
                     st.divider()
 
                     # Display
-                    st.success("**iBuyer Decision**" if result.is_profitable else "**iBuyer Decision**")
+                    st.subheader("iBuyer Decision")
                     col1, col2, col3 = st.columns(3)
                     with col1:
                         st.metric("Offer Price", f"${result.offer_price:,.0f}")
@@ -212,8 +240,8 @@ def main():
                         st.warning("No — offer would be negative or unprofitable.")
 
     st.sidebar.caption(
-        "ZHVI = typical home value index, not median sale price. "
-        "ZIP → metro: county FIPS + Census CBSA, then pgeocode city match; or pick a metro."
+        "ZHVI = typical home value for the metro (not your home’s Zestimate). "
+        "ZIP → metro uses county + Census CBSA when needed; suburbs map to the parent metro."
     )
 
 
