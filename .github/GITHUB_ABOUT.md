@@ -9,9 +9,11 @@ Set this on **github.com → your repo → Code** tab, then click the **⚙️ g
 *(Short version if you hit a character limit:)*  
 **iBuyer-style deal checker — Zillow ZHVI by metro, ZIP→CBSA mapping, Streamlit UI.**
 
-## Website (optional)
+## Website
 
-Paste your **Streamlit Cloud** app URL, e.g. `https://<your-app>.streamlit.app`
+**Live app:** https://openhouse-ai-2hmegkbyadye8uab8l3iua.streamlit.app/
+
+Paste that into the **Website** field in About (or use `--homepage` in the `gh` command below).
 
 ## Suggested topics
 
@@ -28,9 +30,7 @@ gh auth login   # once
 
 gh repo edit dstrunin/Openhouse-Ai \
   --description "Streamlit MVP: iBuyer-style profitability check using Zillow ZHVI, ZIP→metro (Census CBSA), and an offer engine." \
-  --homepage "https://YOUR-APP.streamlit.app" \
+  --homepage "https://openhouse-ai-2hmegkbyadye8uab8l3iua.streamlit.app/" \
   --add-topic streamlit --add-topic python --add-topic zillow \
   --add-topic real-estate --add-topic housing --add-topic data-science
 ```
-
-Replace `--homepage` with your real deploy URL, or omit that flag if you don’t have one yet.

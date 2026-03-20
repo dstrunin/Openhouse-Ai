@@ -1,5 +1,7 @@
 # Openhouse-Ai
 
+**Live app:** [Streamlit (deployed)](https://openhouse-ai-2hmegkbyadye8uab8l3iua.streamlit.app/)
+
 **MVP:** If an iBuyer bought this house today, would they make money?
 
 **Important:** Dollar amounts are built from **Zillow ZHVI** (typical home value for the metro), scaled by your sqft — **not** median sale price or a Zestimate for one address.
